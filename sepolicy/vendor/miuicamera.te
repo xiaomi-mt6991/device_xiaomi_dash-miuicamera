@@ -8,7 +8,7 @@
 # Deliberately NOT ported from the module (user-build neverallow breakers):
 # - allow priv_app vendor_default_prop:file read
 #     -> neverallow base_typeattr_234 (= coredomain): use the labeled
-#        vendor_mtk_camera_prop / vendor_persist_camera_prop instead.
+#        vendor_mtk_camera_prop instead.
 # - allow mtk_hal_camera default_prop:file read
 #     -> neverallow base_typeattr_232 (= non-coredomain): omitted, the HAL
 #        property poll falls back to defaults. Revisit only with the exact
@@ -45,6 +45,9 @@ get_prop(mtk_hal_camera, graphics_config_writable_prop)
 # vendor.camera.* -> vendor_mtk_camera_prop in device policy, which ships
 # the label with zero reader grants). HAL reads OIS/dualcal/module keys.
 get_prop(mtk_hal_camera, vendor_mtk_camera_prop)
+get_prop(cameraserver, vendor_mtk_camera_prop)
+get_prop(priv_app, vendor_mtk_camera_prop)
+get_prop(platform_app, vendor_mtk_camera_prop)
 
 # mtk_hal_camera torch_real_level write + board temp reads under sysfs_therm
 # (device policy grants read; write is the port addition)

@@ -1,5 +1,3 @@
-get_prop(priv_app, vendor_persist_camera_prop)
-
 # NOTE: hal_client_domain(priv_app, hal_camera) is DELIBERATELY NOT used here.
 # It adds priv_app to hal_camera_client, which nests into the hal_camera
 # attribute (proven: priv_app appears in typeattributeset hal_camera), and the
