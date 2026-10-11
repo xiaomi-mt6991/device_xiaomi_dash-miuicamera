@@ -154,3 +154,14 @@ allow platform_app hal_quickcamera_service:service_manager find;
 allow mtk_hal_camera aidlintentaware_service:service_manager { add find };
 allow priv_app aidlintentaware_service:service_manager find;
 allow platform_app aidlintentaware_service:service_manager find;
+
+# MIVI resources in /data/vendor/camera (LUT filter cubes, watermark layout
+# jsons): the app writes them itself (MCAM_MIVILutSaver / sendJsonToMivi -
+# "Failed to write Lut to persist dir" without this) and mtk_hal_camera reads
+# them for CubeLutEffect/watermark rendering. Stock MiuiCamera is a system-uid
+# app; the ported app is a normal-uid platform app, so besides the DAC chmod
+# 0777 in init.mt6991.rc it needs SELinux write on the labeled dir.
+allow mtk_hal_camera vendor_camera_data_file:dir create_dir_perms;
+allow mtk_hal_camera vendor_camera_data_file:file create_file_perms;
+allow { platform_app platform_app_36 priv_app priv_app_36 system_app } vendor_camera_data_file:dir create_dir_perms;
+allow { platform_app platform_app_36 priv_app priv_app_36 system_app } vendor_camera_data_file:file create_file_perms;
