@@ -49,6 +49,10 @@ get_prop(cameraserver, vendor_mtk_camera_prop)
 get_prop(priv_app, vendor_mtk_camera_prop)
 get_prop(platform_app, vendor_mtk_camera_prop)
 
+get_prop(cameraserver, vendor_persist_camera_prop)
+get_prop(priv_app, vendor_persist_camera_prop)
+get_prop(platform_app, vendor_persist_camera_prop)
+
 # mtk_hal_camera torch_real_level write + board temp reads under sysfs_therm
 # (device policy grants read; write is the port addition)
 allow mtk_hal_camera sysfs_therm:file write;
