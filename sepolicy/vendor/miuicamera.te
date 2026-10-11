@@ -44,14 +44,22 @@ get_prop(mtk_hal_camera, graphics_config_writable_prop)
 # Xiaomi camera property block readers (persist.vendor.camera.*,
 # vendor.camera.* -> vendor_mtk_camera_prop in device policy, which ships
 # the label with zero reader grants). HAL reads OIS/dualcal/module keys.
+# get_prop(platform_app, ...) above does NOT cover the per-targetSdk variants
+# this AOSP assigns (platform_app_36 observed live, denials for both
+# vendor_mtk_camera_prop and vendor_persist_camera_prop). appdomain is a public
+# attribute (system/sepolicy/public/attributes) so vendor policy may grant it.
+# Untrusted apps gaining find/read on these is equivalent to stock, which
+# ships persist.vendor.camera.privapp.list for them.
 get_prop(mtk_hal_camera, vendor_mtk_camera_prop)
 get_prop(cameraserver, vendor_mtk_camera_prop)
 get_prop(priv_app, vendor_mtk_camera_prop)
 get_prop(platform_app, vendor_mtk_camera_prop)
+get_prop(appdomain, vendor_mtk_camera_prop)
 
 get_prop(cameraserver, vendor_persist_camera_prop)
 get_prop(priv_app, vendor_persist_camera_prop)
 get_prop(platform_app, vendor_persist_camera_prop)
+get_prop(appdomain, vendor_persist_camera_prop)
 
 # mtk_hal_camera torch_real_level write + board temp reads under sysfs_therm
 # (device policy grants read; write is the port addition)
@@ -78,11 +86,15 @@ allow mtk_hal_camera unlabeled:filesystem getattr;
 # custom so no neverallow can cover it - hal_client_domain on hal_camera_service
 # is NOT an option (drags priv_app into hal_camera attr, trips video_device
 # neverallows). Provider is camerahalserver (mtk_hal_camera domain).
+# priv_app and the per-targetSdk variants this AOSP assigns (platform_app_36
+# observed live). appdomain is public policy, and xiaomi_mivi_service is a
+# custom service_manager_type so it has no neverallow coverage (see
+# service.te). Untrusted apps discovering these matches stock, which ships
+# persist.vendor.camera.privapp.list.
 allow priv_app xiaomi_mivi_service:service_manager find;
-allow mtk_hal_camera xiaomi_mivi_service:service_manager add;
-# platform_app mirror (same identity duality as above; fresh type, no
-# neverallow coverage possible).
 allow platform_app xiaomi_mivi_service:service_manager find;
+allow appdomain xiaomi_mivi_service:service_manager find;
+allow mtk_hal_camera xiaomi_mivi_service:service_manager add;
 
 # Xiaomi camera HAL services provided by camerahalserver (mtk_hal_camera).
 # Labels in device/xiaomi/dash/sepolicy/vendor/service.te, service instances
@@ -100,6 +112,7 @@ allow platform_app xiaomi_mivi_service:service_manager find;
 allow mtk_hal_camera hal_mivimessage_service:service_manager { add find };
 allow priv_app hal_mivimessage_service:service_manager find;
 allow platform_app hal_mivimessage_service:service_manager find;
+allow appdomain hal_mivimessage_service:service_manager find;
 allow mtk_hal_camera hal_quickcamera_service:service_manager { add find };
 allow priv_app hal_quickcamera_service:service_manager find;
 allow platform_app hal_quickcamera_service:service_manager find;
