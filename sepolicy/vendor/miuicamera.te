@@ -87,13 +87,25 @@ allow mtk_hal_camera unlabeled:filesystem getattr;
 # is NOT an option (drags priv_app into hal_camera attr, trips video_device
 # neverallows). Provider is camerahalserver (mtk_hal_camera domain).
 # priv_app and the per-targetSdk variants this AOSP assigns (platform_app_36
-# observed live). appdomain is public policy, and xiaomi_mivi_service is a
-# custom service_manager_type so it has no neverallow coverage (see
-# service.te). Untrusted apps discovering these matches stock, which ships
-# persist.vendor.camera.privapp.list.
+# observed live). platform_app_36 is its own type, not in the platform_app
+# attribute, so the platform_app grant above does not reach it. Two broader
+# source sets were tried and both were rejected by the neverallow check:
+#   appdomain - isolated_app_all.te:81 lets isolated_app find only four
+#   services, and domain.te:946 restricts { appdomain -coredomain } to
+#   app_api_service / hal_service_type / a fixed exemption list, which the
+#   bare service_manager_type labels (this one, hal_mivimessage_service) are
+#   not in - the non-core app domains (esimswitcher_app, sensorhub_app,
+#   parts_app, ...) tripped it.
+#   coredomain - too wide: it also contains isolated_app itself plus
+#   webview_zygote, native_app_zygote, app_zygote (each has a private neverallow
+#   on service_manager find) and init (neverallow init service_manager_type
+#   service_manager { add find }).
+# So the source set is the explicit platform-signed app types, all public so
+# vendor policy can name them: platform_app, platform_app_36, priv_app,
+# priv_app_36 (public/priv_app.te) and system_app.
 allow priv_app xiaomi_mivi_service:service_manager find;
 allow platform_app xiaomi_mivi_service:service_manager find;
-allow appdomain xiaomi_mivi_service:service_manager find;
+allow { platform_app_36 priv_app_36 system_app } xiaomi_mivi_service:service_manager find;
 allow mtk_hal_camera xiaomi_mivi_service:service_manager add;
 
 # Xiaomi camera HAL services provided by camerahalserver (mtk_hal_camera).
@@ -109,10 +121,33 @@ allow mtk_hal_camera xiaomi_mivi_service:service_manager add;
 # find mirrors the stock client sets for the camera-relevant identities
 # (system_server/system_app finds omitted - unobserved, and vendor policy
 # granting system domains risks neverallows).
+# Xiaomi misys/hypsys AIDL service (vendor.xiaomi.hardware.misys.common
+# .IMiSysImpl, IHypSysSsi), served by /vendor/bin/hypsys_vendor in the
+# hal_hypsys_vendor domain, labeled hal_hypsys_vendor_service in
+# device/xiaomi/dash/sepolicy/vendor/service_contexts. Source set is the same
+# explicit platform-signed app set as above (hal_service_type exempts it from
+# domain.te:946, but the zygote/init/isolated neverallows still apply).
+allow { platform_app_36 priv_app_36 system_app } hal_hypsys_vendor_service:service_manager find;
+
+# BGServiceClient (com.android.camera) calls camerahalserver's binder
+# directly. The base platform_app/priv_app get this from the camera client
+# attribute, which the per-targetSdk types are not members of - observed:
+#   avc: denied { call } scontext=platform_app_36 tcontext=mtk_hal_camera
+#   tclass=binder permissive=0 app=com.android.camera
+binder_call(platform_app_36, mtk_hal_camera)
+binder_call(priv_app_36, mtk_hal_camera)
+# The macro only lets the server reply (transfer), never call back into the
+# client - observed HAL->app callback denial (BGServiceClient path):
+#   avc: denied { call } scontext=mtk_hal_camera tcontext=platform_app_36
+#   tclass=binder permissive=0 (3x per camera session)
+# Mirrors the explicit base-app grants above (call transfer both ways);
+# neverallow-clean (no appdomain binder-call neverallows in plat policy).
+allow mtk_hal_camera { platform_app_36 priv_app_36 }:binder call;
+
 allow mtk_hal_camera hal_mivimessage_service:service_manager { add find };
 allow priv_app hal_mivimessage_service:service_manager find;
 allow platform_app hal_mivimessage_service:service_manager find;
-allow appdomain hal_mivimessage_service:service_manager find;
+allow { platform_app_36 priv_app_36 system_app } hal_mivimessage_service:service_manager find;
 allow mtk_hal_camera hal_quickcamera_service:service_manager { add find };
 allow priv_app hal_quickcamera_service:service_manager find;
 allow platform_app hal_quickcamera_service:service_manager find;
