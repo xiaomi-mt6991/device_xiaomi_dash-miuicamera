@@ -163,5 +163,9 @@ allow platform_app aidlintentaware_service:service_manager find;
 # 0777 in init.mt6991.rc it needs SELinux write on the labeled dir.
 allow mtk_hal_camera vendor_camera_data_file:dir create_dir_perms;
 allow mtk_hal_camera vendor_camera_data_file:file create_file_perms;
+# The HAL keeps its IPC socket (ec_op_server_socket) inside this dir; the
+# unlink denial left a stale socket behind and broke the storage proxy path
+# (DsacProxy::getBuffer null-deref crash in camerahalserver).
+allow mtk_hal_camera vendor_camera_data_file:sock_file { create unlink link setattr };
 allow { platform_app platform_app_36 priv_app priv_app_36 system_app } vendor_camera_data_file:dir create_dir_perms;
 allow { platform_app platform_app_36 priv_app priv_app_36 system_app } vendor_camera_data_file:file create_file_perms;
