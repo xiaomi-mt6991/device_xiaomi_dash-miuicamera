@@ -1,0 +1,54 @@
+From 8a52475e67bed25dba6b87665addd9299496b173 Mon Sep 17 00:00:00 2001
+From: therealmharc <therealmharc@gmail.com>
+Date: Thu, 15 Oct 2026 01:39:09 +0800
+Subject: [PATCH] Stage filter LUTs when building the render tag
+
+The per-tap LUT saver resolves names through the cloud-filter record and
+can silently skip (second filter tap staged nothing), while the render
+tag still advertises lutNames to the FilterPlugin - the HAL then finds
+no file under /data/vendor/camera and applies no filter. Stage every
+lutName right where the tag is built; the saver dedupes per name.
+---
+ smali/w8/c.smali | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/smali/w8/c.smali b/smali/w8/c.smali
+index ba73ed87..3be9ca6f 100644
+--- a/smali/w8/c.smali
++++ b/smali/w8/c.smali
+@@ -1665,6 +1665,32 @@
+ 
+     invoke-virtual {v3, v4, v7}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+ 
++    # stage each LUT into the dir the render tag points at, one-shot per name
++    iget-object v4, v0, Lw8/c;->p:Ljava/util/ArrayList;
++
++    invoke-virtual {v4}, Ljava/util/ArrayList;->iterator()Ljava/util/Iterator;
++
++    move-result-object v4
++
++    :lut_stage_loop
++    invoke-interface {v4}, Ljava/util/Iterator;->hasNext()Z
++
++    move-result v7
++
++    if-eqz v7, :lut_stage_done
++
++    invoke-interface {v4}, Ljava/util/Iterator;->next()Ljava/lang/Object;
++
++    move-result-object v7
++
++    check-cast v7, Ljava/lang/String;
++
++    invoke-static {v7}, Lw8/b;->b(Ljava/lang/String;)V
++
++    goto :lut_stage_loop
++
++    :lut_stage_done
++
+     .line 213
+     iget v4, v0, Lv8/b;->a:I
+ 
+-- 
+2.56.0
+
