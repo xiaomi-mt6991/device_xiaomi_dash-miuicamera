@@ -1,0 +1,81 @@
+From bf3e10f5d02ce12d06af6af962b9ad1c4f40b017 Mon Sep 17 00:00:00 2001
+From: therealmharc <therealmharc@gmail.com>
+Date: Wed, 14 Oct 2026 22:14:48 +0800
+Subject: [PATCH] Open gallery from camera with standard AOSP intents
+
+The gallery/review paths pin setPackage("com.miui.gallery"), which does
+not exist on AOSP ROMs, so tapping the thumbnail does nothing: the
+queryIntentActivities check comes back empty and the explicit start
+throws ActivityNotFoundException into the catch path. Drop the package
+pin from the REVIEW intent so the system resolves any installed handler
+(Photos, Gallery2, third-party galleries); the pre-existing package-free
+ACTION_VIEW fallback already covers galleries that do not handle REVIEW.
+The two no-gallery gotoGallery paths switch from the MIUI-only
+VIEW_EMPTY_PHOTO action to ACTION_VIEW on the MediaStore images URI,
+the standard way to open whatever gallery app is installed.
+---
+ smali/com/android/camera/Camera.smali | 14 ++++++--------
+ smali/v1/r0.smali                     |  4 ----
+ 2 files changed, 6 insertions(+), 12 deletions(-)
+
+diff --git a/smali/com/android/camera/Camera.smali b/smali/com/android/camera/Camera.smali
+index 21913f81..3def63b0 100644
+--- a/smali/com/android/camera/Camera.smali
++++ b/smali/com/android/camera/Camera.smali
+@@ -5215,8 +5215,6 @@
+ 
+     const-string v2, "gotoGallery: no gallery"
+ 
+-    const-string v3, "com.miui.gallery"
+-
+     if-eqz v0, :cond_10
+ 
+     sget-boolean v0, Lf9/b;->e:Z
+@@ -5232,11 +5230,11 @@
+ 
+     new-instance v0, Landroid/content/Intent;
+ 
+-    const-string v4, "com.miui.gallery.action.VIEW_EMPTY_PHOTO"
++    const-string v4, "android.intent.action.VIEW"
+ 
+-    invoke-direct {v0, v4}, Landroid/content/Intent;-><init>(Ljava/lang/String;)V
++    sget-object v3, Landroid/provider/MediaStore$Images$Media;->EXTERNAL_CONTENT_URI:Landroid/net/Uri;
+ 
+-    invoke-virtual {v0, v3}, Landroid/content/Intent;->setPackage(Ljava/lang/String;)Landroid/content/Intent;
++    invoke-direct {v0, v4, v3}, Landroid/content/Intent;-><init>(Ljava/lang/String;Landroid/net/Uri;)V
+ 
+     const-string v3, "from_MiuiCamera"
+ 
+@@ -5273,11 +5271,11 @@
+     :try_start_8
+     new-instance v0, Landroid/content/Intent;
+ 
+-    const-string v4, "android.intent.action.MAIN"
++    const-string v4, "android.intent.action.VIEW"
+ 
+-    invoke-direct {v0, v4}, Landroid/content/Intent;-><init>(Ljava/lang/String;)V
++    sget-object v3, Landroid/provider/MediaStore$Images$Media;->EXTERNAL_CONTENT_URI:Landroid/net/Uri;
+ 
+-    invoke-virtual {v0, v3}, Landroid/content/Intent;->setPackage(Ljava/lang/String;)Landroid/content/Intent;
++    invoke-direct {v0, v4, v3}, Landroid/content/Intent;-><init>(Ljava/lang/String;Landroid/net/Uri;)V
+ 
+     invoke-virtual {v5, v0}, Landroid/content/Context;->startActivity(Landroid/content/Intent;)V
+ 
+diff --git a/smali/v1/r0.smali b/smali/v1/r0.smali
+index 99c97c96..904383ae 100644
+--- a/smali/v1/r0.smali
++++ b/smali/v1/r0.smali
+@@ -140,10 +140,6 @@
+     invoke-direct {v1, v5, p2}, Landroid/content/Intent;-><init>(Ljava/lang/String;Landroid/net/Uri;)V
+ 
+     :goto_0
+-    const-string p2, "com.miui.gallery"
+-
+-    invoke-virtual {v1, p2}, Landroid/content/Intent;->setPackage(Ljava/lang/String;)Landroid/content/Intent;
+-
+     const-string p2, "from_MiuiCamera"
+ 
+     invoke-virtual {v1, p2, v2}, Landroid/content/Intent;->putExtra(Ljava/lang/String;Z)Landroid/content/Intent;
+-- 
+2.56.0
+
