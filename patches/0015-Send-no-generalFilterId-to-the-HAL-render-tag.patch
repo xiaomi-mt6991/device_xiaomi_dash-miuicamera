@@ -1,0 +1,35 @@
+From 5c1e9a73b4d8f02e6a9c3b71d5e84f092a6c1d3 Mon Sep 17 00:00:00 2001
+From: therealmharc <therealmharc@gmail.com>
+Date: Thu, 16 Oct 2026 02:30:00 +0800
+Subject: [PATCH] Send no generalFilterId to the HAL render tag
+
+0014 emptied filterScript and lutNames, and that part works - the tag now
+goes out as {"generalFilterId":33,"filterScript":"","lutNames":[]}. But the
+filter id was still naming a filter, so the HAL built the FilterPlugin
+pipeline anyway: CandySDK ran 385 times, GPUVideoFilter initialised 30
+times and the LeicaFilter C3D table was queried 1726 times, straight up
+to a __release_weak() on a freed control block in MiaNode::processRequest.
+
+Force the id to zero so the tag carries no filter id, no script and no
+LUT names. That is the whole of the filter's channel into the HAL.
+
+Captures and recording are unaffected; the saved photo carries no Leica
+filter.
+---
+ smali/w8/c.smali | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/smali/w8/c.smali b/smali/w8/c.smali
+--- a/smali/w8/c.smali
++++ b/smali/w8/c.smali
+@@ -924,6 +924,10 @@
+     .line 107
+     :cond_17
+     const-string v5, "generalFilterId"
++    # no filter id either: with the script and LUT list already empty (0014)
++    # the tag still named a filter, so the HAL built the FilterPlugin pipeline
++    # anyway and drove CandySDK/GPUVideoFilter into a heap UAF.
++    const/4 v4, 0x0
+ 
+     invoke-static {v4}, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
+ 
