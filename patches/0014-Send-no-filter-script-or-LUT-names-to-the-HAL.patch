@@ -1,0 +1,52 @@
+From 9b7d2e14c0a83f5d6e1b74c9a2f8e0d31547b6c9 Mon Sep 17 00:00:00 2001
+From: therealmharc <therealmharc@gmail.com>
+Date: Thu, 16 Oct 2026 00:45:00 +0800
+Subject: [PATCH] Send no filter script or LUT names to the HAL render tag
+
+Patch 0013 stops the app setting the capture filter tag, but the render
+tag built here is a second, independent way for the filter to reach the
+HAL, and it was still carrying a populated filterScript and lutNames
+list. With those in place the FilterPlugin pipeline is built and
+camerahalserver corrupts its heap:
+
+  libmtkcam_streamutils.so UsersManager::~UsersManager() from
+  HalImageStreamBuffer::setUsersManager, fault 0x100000007, tid SttRR_Event
+  libmtkcam_imgbuf_v2.so BaseImageBuffer::getPlaneOffsetInBytes() from
+  libfeature_vrp vrpP2ANode::composeRunCtrl, fault 0x18, tid CTMThread4-00
+
+Both are the same ownership bug seen from two threads: a buffer is
+released while the pipeline still holds it. Neither library has source
+in this tree, so the fix is to not build the pipeline - put an empty
+script and an empty LUT list in the tag. The keys stay present so the
+HAL still gets a well formed tag, it just has no filter in it. The LUT
+staging loop from 0012 still runs and is harmless.
+
+Captures and recording are unaffected; the saved photo carries no Leica
+filter.
+---
+ smali/w8/c.smali | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/smali/w8/c.smali b/smali/w8/c.smali
+--- a/smali/w8/c.smali
++++ b/smali/w8/c.smali
+@@ -1655,13 +1655,18 @@
+ 
+     .line 211
+     const-string v4, "filterScript"
++    # drop the filter script: the HAL FilterPlugin pipeline corrupts its heap
++    # when a filter is present (libmtkcam_streamutils ~UsersManager UAF and
++    # libfeature_vrp vrpP2ANode NULL ImageBuffer). No script, no pipeline.
++    const-string v7, ""
+ 
+     invoke-virtual {v3, v4, v7}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+ 
+     .line 212
+     const-string v4, "lutNames"
+ 
+-    iget-object v7, v0, Lw8/c;->p:Ljava/util/ArrayList;
++    new-instance v7, Ljava/util/ArrayList;
++    invoke-direct {v7}, Ljava/util/ArrayList;-><init>()V
+ 
+     invoke-virtual {v3, v4, v7}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+ 
