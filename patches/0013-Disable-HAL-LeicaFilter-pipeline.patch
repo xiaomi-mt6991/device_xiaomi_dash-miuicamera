@@ -1,0 +1,40 @@
+From 4d1c0b7e9a2f5836c07b1d4e8f3a6b9520c7e14 Mon Sep 17 00:00:00 2001
+From: therealmharc <therealmharc@gmail.com>
+Date: Thu, 15 Oct 2026 22:55:00 +0800
+Subject: [PATCH] Disable the HAL LeicaFilter pipeline
+
+Every capture or recording that has a Leica filter selected takes
+camerahalserver down.  The HAL builds its FilterPlugin pipeline as soon
+as the app sets the filter tag, and the heap it works on comes back
+corrupted: tombstones land in unrelated places each run (mialgoengine,
+micamera_hal_core ImageTarget::releaseBuffer, mtkcam_streamutils
+UsersManager::queryUser_ with a recycled map head, libui
+GraphicBuffer, libfeature_vrp checkROI), which is the signature of an
+out-of-bounds write rather than one bad pointer.  It is not size
+dependent - 4096x3072 crashes as reliably as 5184x3888 - and disabling
+AFBC/AFRC on the device does not help, so it is not a stride or
+compression issue either.
+
+setCaptureFilterEnable() is the single point that feeds both the
+preview-side flag and the capture request tag (z8/r->W3), so forcing it
+false keeps the whole FilterPlugin pipeline out of the HAL.  Camera
+sessions, captures and recording keep working; the photo just no longer
+carries the Leica filter until the vendor side is fixed.
+---
+ smali/i8/K.smali | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/smali/i8/K.smali b/smali/i8/K.smali
+--- a/smali/i8/K.smali
++++ b/smali/i8/K.smali
+@@ -2182,6 +2182,10 @@
+ 
+     invoke-static {v1, v0}, Lcom/android/camera/log/Log;->v(Ljava/lang/String;Ljava/lang/String;)V
+ 
++    # force the HAL filter path off: camerahalserver corrupts its heap when the
++    # FilterPlugin pipeline is enabled on this port (see 0012 for the LUT side)
++    const/4 p1, 0x0
++
+     invoke-virtual {p0}, Li8/K;->d()Ljava/util/Optional;
+ 
+     move-result-object p0
